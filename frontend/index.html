@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/assets/prisma-banking.ico">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="PRISMA Educacional - Banking"
+    >
+
+    <title>PRISMA Educacional | Banking</title>
+
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+    <div class="login-page">
+
+        <!-- CABEÇALHO -->
+        <header class="topbar">
+
+            <div class="brand">
+                <img
+                    src="/assets/logo-prisma.png"
+                    alt="PRISMA Educacional"
+                    class="logo"
+                >
+            </div>
+
+            <div class="environment">
+                <span class="status-dot"></span>
+
+                <div>
+                    <strong>AMBIENTE DE SIMULAÇÃO</strong>
+                    <small>PRISMA Banking</small>
+                </div>
+            </div>
+
+        </header>
+
+
+        <!-- ÁREA PRINCIPAL -->
+        <main class="login-container">
+
+            <section class="login-panel">
+
+                <div class="login-header">
+
+                    <span class="section-label">
+                        ACESSO AO SISTEMA
+                    </span>
+
+                    <h1>
+                        Banking
+                    </h1>
+
+                    <p>
+                        Entre com as suas credenciais para
+                        iniciar a sessão de formação.
+                    </p>
+
+                </div>
+
+
+                <!-- MENSAGEM DE ERRO -->
+                <div
+                    id="loginMessage"
+                    class="login-message"
+                    role="alert"
+                ></div>
+
+
+                <!-- FORMULÁRIO -->
+                <form id="loginForm">
+
+                    <div class="form-group">
+                        <label for="codigoOperador">Código do operador</label>
+                        <input type="text" id="codigoOperador" name="codigoOperador"
+                               placeholder="Ex.: OP-000001" autocomplete="username"
+                               maxlength="30" required>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="password-label">
+                            <label for="senha">Palavra-passe</label>
+                        </div>
+                        <div class="password-wrapper">
+                            <input type="password" id="senha" name="senha"
+                                   placeholder="Introduza a palavra-passe"
+                                   autocomplete="current-password" required>
+                            <button type="button" id="togglePassword"
+                                    class="password-toggle"
+                                    aria-label="Mostrar palavra-passe">Mostrar</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="loginButton" class="login-button">
+                        <span id="loginButtonText">Iniciar sessão</span>
+                    </button>
+                </form>
+
+                <div class="auth-links">
+                    <span>Ainda não possui acesso?</span>
+                    <button type="button" id="abrirRegistoButton" class="link-button">
+                        Criar conta de formando
+                    </button>
+                </div>
+
+                <form id="registoForm" class="register-form" hidden>
+                    <div class="register-title">Novo acesso de formando</div>
+                    <p class="register-help">O sistema atribui automaticamente o código do operador. O perfil FORMADOR é criado exclusivamente pela administração.</p>
+
+                    <div class="form-group">
+                        <label for="regNome">Nome completo</label>
+                        <input type="text" id="regNome" required maxlength="120">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regUtilizador">Nome de utilizador</label>
+                        <input type="text" id="regUtilizador" required maxlength="40" autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regSenha">Palavra-passe</label>
+                        <input type="password" id="regSenha" required minlength="6" autocomplete="new-password">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regConfirmarSenha">Confirmar palavra-passe</label>
+                        <input type="password" id="regConfirmarSenha" required minlength="6" autocomplete="new-password">
+                    </div>
+
+                    <button type="submit" class="secondary-action">Criar acesso</button>
+                    <button type="button" id="cancelarRegistoButton" class="link-button">Voltar ao acesso</button>
+                </form>
+
+
+            </section>
+
+        </main>
+
+
+        <!-- RODAPÉ -->
+        <footer class="footer">
+
+            <div>
+                PRISMA EDUCACIONAL &amp; NEGÓCIOS
+            </div>
+
+            <div>
+                Sistema exclusivamente educacional
+                <span>•</span>
+                Sem validade bancária
+            </div>
+
+        </footer>
+
+    </div>
+
+
+<script src="/js/dashboard.js?v=0.13.3"></script>
+<script src="/js/modules/core.js?v=0.13.3"></script>
+<script src="/js/modules/cartoes.js?v=0.13.3"></script>
+<script src="/js/modules/cheques.js?v=0.13.3"></script>
+<script src="/js/modules/formacao.js?v=0.13.3"></script>
+<script src="/js/modules/gestao.js?v=0.13.3"></script>
+<script src="/js/modules/relatorios.js?v=0.13.3"></script>
+<script src="/js/modules/reconciliacao.js?v=0.13.3"></script>
+<script src="/js/app.js?v=0.13.3"></script>
+</body>
+
+</html>

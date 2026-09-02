@@ -1,0 +1,10 @@
+const express=require('express');
+const c=require('../controllers/operacoesController');
+const { exigirPermissao } = require('../middleware/permissoes');
+const r=express.Router();
+r.get('/contas',exigirPermissao('CONTAS_VISUALIZAR'),c.listarContas); r.get('/contas/:id',exigirPermissao('CONTAS_VISUALIZAR'),c.obterConta); r.get('/contas/:id/historico',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.historicoConta); r.post('/contas',exigirPermissao('CONTAS_ABRIR'),c.abrirConta);
+r.get('/movimentos',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.listarMovimentos); r.get('/caixa/resumo',exigirPermissao('CAIXA_OPERAR'),c.resumoCaixa); r.get('/caixa/historico',exigirPermissao('CAIXA_OPERAR'),c.historicoCaixa); r.post('/caixa',exigirPermissao('CAIXA_OPERAR'),c.operacaoCaixa); r.post('/pagamentos-servicos',exigirPermissao('CAIXA_OPERAR'),c.pagarServico); r.post('/caixa/fecho',exigirPermissao('CAIXA_RECONCILIAR'),c.fecharCaixa);
+r.post('/transferencias',exigirPermissao('TRANSFERENCIAS_OPERAR'),c.transferir); r.post('/credito/simular',exigirPermissao('CREDITO_SIMULAR'),c.simularCredito); r.post('/credito',exigirPermissao('CREDITO_OPERAR'),c.criarCredito); r.post('/risco',exigirPermissao('RISCO_ANALISAR'),c.analisarRisco);
+r.get('/clientes/:id/historico',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.historicoCliente);
+r.get('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.listarComprovativos); r.get('/comprovativos/:id',exigirPermissao('COMPROVATIVOS_EMITIR'),c.obterComprovativo); r.post('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.registarComprovativo);
+module.exports=r;

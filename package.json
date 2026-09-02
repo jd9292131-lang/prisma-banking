@@ -1,0 +1,58 @@
+{
+  "name": "prisma-banking",
+  "version": "0.13.3",
+  "description": "PRISMA Banking — plataforma profissional de formação bancária",
+  "main": "electron-main.js",
+  "author": "PRISMA Educacional",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "dist:all": "npm run dist && npm run dist:portable",
+    "prepare:backend": "npm ci --prefix backend --omit=dev",
+    "pre-dist": "npm run prepare:backend && npm run verify && npm run preflight:build",
+    "pre-dist:portable": "npm run prepare:backend && npm run verify && npm run preflight:build",
+    "verify": "node scripts/verify.js",
+    "preflight:build": "node scripts/preflight-build.js"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "ao.prisma.educacional.banking",
+    "productName": "PRISMA Banking",
+    "asar": true,
+    "asarUnpack": [
+      "backend/**/*"
+    ],
+    "files": [
+      "electron-main.js",
+      "backend/**/*",
+      "frontend/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "PRISMA-Banking-${version}-${arch}.${ext}",
+      "icon": "frontend/assets/prisma-banking.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
