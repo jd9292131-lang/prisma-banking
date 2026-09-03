@@ -2878,3 +2878,286 @@ input:focus,select:focus{
 .sidebar button i {
     color: #000000 !important;
 }
+/* =========================================================
+   MOVIMENTOS — TABELA PROFISSIONAL
+   ========================================================= */
+
+.movimentos-table-scroll {
+    width: 100%;
+    max-height: 650px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+}
+
+/*
+ * Aproximadamente 13 linhas ficam visíveis.
+ * O cabeçalho permanece fixo durante o scroll.
+ */
+.movimentos-data-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.movimentos-data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--prisma-blue-dark);
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+.movimentos-data-table tbody tr {
+    cursor: pointer;
+}
+
+.movimentos-data-table tbody tr:hover {
+    background: #f5f8fb;
+}
+
+.movimentos-data-table tbody tr:focus {
+    outline: 2px solid var(--prisma-blue);
+    outline-offset: -2px;
+}
+
+.movimentos-data-table td {
+    vertical-align: middle;
+}
+
+/* =========================================================
+   DATA / HORA
+   ========================================================= */
+
+.movimento-data {
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+/* =========================================================
+   CONTA
+   ========================================================= */
+
+.movimento-conta {
+    white-space: nowrap;
+    color: var(--prisma-blue);
+}
+
+/* =========================================================
+   CLIENTE
+   ========================================================= */
+
+.movimento-cliente {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 180px;
+}
+
+.movimento-avatar {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #edf2f7;
+    color: var(--prisma-blue-dark);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.movimento-cliente-nome {
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* =========================================================
+   TIPOS DE MOVIMENTO
+   ========================================================= */
+
+.movimento-tipo {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.movimento-tipo.entrada {
+    color: #16803c;
+}
+
+.movimento-tipo.saida {
+    color: #c62828;
+}
+
+.movimento-tipo.saida-transferencia {
+    color: var(--prisma-orange);
+}
+
+.movimento-tipo.neutro {
+    color: var(--text-secondary);
+}
+
+/* =========================================================
+   VALORES
+   ========================================================= */
+
+.movimento-valor {
+    font-weight: 800;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.movimento-valor.entrada {
+    color: #16803c;
+}
+
+.movimento-valor.saida {
+    color: #c62828;
+}
+
+.movimento-valor.saida-transferencia {
+    color: var(--prisma-orange);
+}
+
+.movimento-valor.neutro {
+    color: var(--text);
+}
+
+/* =========================================================
+   SALDO
+   ========================================================= */
+
+.movimento-saldo {
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   REFERÊNCIA
+   ========================================================= */
+
+.movimento-referencia {
+    color: var(--text-secondary);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* =========================================================
+   INFORMAÇÃO DA TABELA
+   ========================================================= */
+
+.movimentos-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-top: 10px;
+    padding: 0 4px;
+    color: var(--text-light);
+    font-size: 0.82rem;
+}
+
+.movimentos-info strong {
+    color: var(--text);
+}
+
+/* =========================================================
+   RESUMO FINANCEIRO
+   ========================================================= */
+
+.movimentos-resumo {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.movimento-resumo-card {
+    min-height: 88px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+}
+
+.movimento-resumo-card span {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.movimento-resumo-card strong {
+    font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.movimento-resumo-card.entrada strong {
+    color: #16803c;
+}
+
+.movimento-resumo-card.saida strong {
+    color: #c62828;
+}
+
+.movimento-resumo-card.saldo strong {
+    color: var(--prisma-blue-dark);
+}
+
+/* =========================================================
+   SCROLLBAR DA TABELA
+   ========================================================= */
+
+.movimentos-table-scroll::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+
+.movimentos-table-scroll::-webkit-scrollbar-track {
+    background: #edf1f5;
+}
+
+.movimentos-table-scroll::-webkit-scrollbar-thumb {
+    background: #aab4bf;
+    border-radius: 10px;
+}
+
+.movimentos-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #7e8b98;
+}
+
+/* =========================================================
+   RESPONSIVO
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+    .movimentos-resumo {
+        grid-template-columns: 1fr;
+    }
+
+    .movimentos-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .movimentos-table-scroll {
+        max-height: 620px;
+    }
+}

@@ -890,12 +890,254 @@ async function renderMovimentosReal(main, utilizador) {
                 && (!termo || texto.includes(termo));
         });
 
-        const alvo = document.getElementById('movimentosTable');
-        if (!alvo) return;
-        alvo.innerHTML = filtrados.length
-            ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>Data</th><th>Conta</th><th>Cliente</th><th>Operação</th><th>Valor</th><th>Saldo</th><th>Referência</th></tr></thead><tbody>${filtrados.map((m, index) => `<tr class="movement-row" data-movimento-index="${movimentos.indexOf(m)}" tabindex="0" title="Clique para consultar o movimento e emitir comprovativo"><td>${formatarDataHora(m.criado_em)}</td><td>${escaparHTML(m.numero_conta)}</td><td>${escaparHTML(m.cliente_nome)}</td><td>${escaparHTML(m.tipo)}</td><td>${moeda(m.valor)}</td><td>${moeda(m.saldo_posterior)}</td><td>${escaparHTML(m.referencia || '—')}</td></tr>`).join('')}</tbody></table></div>`
-            : '<div class="empty-state compact"><strong>Nenhum movimento encontrado.</strong><p>Use F2 para selecionar um cliente ou conta existente.</p></div>';
+const alvo = document.getElementById('movimentosTable');
+if (!alvo) return;
 
+if (!filtrados.length) {
+    alvo.innerHTML = `
+        <div class="empty-state compact">
+            <strong>Nenhum movimento encontrado.</strong>
+            <p>Use F2 para selecionar um cliente ou conta existente.</p>
+        </div>
+    `;
+    return;
+}
+
+/*
+ * Configuração visual dos tipos de movimento.
+ * O valor armazenado na BD é positivo.
+ * O sinal apresentado depende do tipo da operação.
+ */
+function configurarMovimento(tipo) {
+    const mapa = {
+        DEPOSITO: {
+            classe: 'entrada',
+            sinal: '+',
+            label: 'Depósito'
+        },
+        DEPOSITO_INICIAL: {
+            classe: 'entrada',
+            sinal: '+',
+            label: 'Depósito inicial'
+        },
+        LEVANTAMENTO: {
+            classe: 'saida',
+            sinal: '−',
+            label: 'Levantamento'
+        },
+        TRANSFERENCIA_RECEBIDA: {
+            classe: 'entrada',
+            sinal: '+',
+            label: 'Transferência recebida'
+        },
+        TRANSFERENCIA_ENVIADA: {
+            classe: 'saida-transferencia',
+            sinal: '−',
+            label: 'Transferência enviada'
+        },
+        PAGAMENTO_SERVICO: {
+            classe: 'saida',
+            sinal: '−',
+            label: 'Pagamento de serviço'
+        }
+    };
+
+    return mapa[tipo] || {
+        classe: 'neutro',
+        sinal: '',
+        label: String(tipo || 'Movimento').replaceAll('_', ' ')
+    };
+}
+
+/*
+ * Iniciais do cliente.
+ * Ex.: João Manuel -> JM
+ */
+function iniciaisCliente(nome) {
+    const partes = String(nome || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (!partes.length) return '—';
+
+    if (partes.length === 1) {
+        return partes[0].substring(0, 2).toUpperCase();
+    }
+
+    return `${partes[0][0]}${partes[1][0]}`.toUpperCase();
+}
+
+/*
+ * Apenas 13 movimentos ficam visíveis.
+ * Os restantes continuam dentro da área com scroll.
+ */
+const movimentosVisiveis = filtrados.slice(0, 13);
+
+const linhas = movimentosVisiveis.map(m => {
+    const config = configurarMovimento(m.tipo);
+    const valorNumerico = Number(m.valor || 0);
+
+    const valorFormatado = `${config.sinal}${moeda(valorNumerico)}`;
+
+    const nomeCliente = m.cliente_nome || 'Cliente não identificado';
+    const iniciais = iniciaisCliente(nomeCliente);
+
+    return `
+        <tr
+            class="movement-row"
+            data-movimento-index="${movimentos.indexOf(m)}"
+            tabindex="0"
+            title="Clique para consultar o movimento e emitir comprovativo"
+        >
+            <td class="movimento-data">
+                <span>${escaparHTML(formatarDataHora(m.criado_em))}</span>
+            </td>
+
+            <td>
+                <strong class="movimento-conta">
+                    ${escaparHTML(m.numero_conta || '—')}
+                </strong>
+            </td>
+
+            <td>
+                <div class="movimento-cliente">
+                    <span class="movimento-avatar">
+                        ${escaparHTML(iniciais)}
+                    </span>
+
+                    <span class="movimento-cliente-nome">
+                        ${escaparHTML(nomeCliente)}
+                    </span>
+                </div>
+            </td>
+
+            <td>
+                <span class="movimento-tipo ${config.classe}">
+                    ${escaparHTML(config.label)}
+                </span>
+            </td>
+
+            <td>
+                <strong class="movimento-valor ${config.classe}">
+                    ${escaparHTML(valorFormatado)}
+                </strong>
+            </td>
+
+            <td>
+                <span class="movimento-saldo">
+                    ${escaparHTML(moeda(m.saldo_posterior))}
+                </span>
+            </td>
+
+            <td>
+                <span class="movimento-referencia">
+                    ${escaparHTML(m.referencia || '—')}
+                </span>
+            </td>
+        </tr>
+    `;
+}).join('');
+
+/*
+ * Totais calculados sobre TODOS os movimentos filtrados,
+ * não apenas sobre as 13 linhas visíveis.
+ */
+const totalDepositos = filtrados.reduce((total, m) => {
+    if (['DEPOSITO', 'DEPOSITO_INICIAL', 'TRANSFERENCIA_RECEBIDA'].includes(m.tipo)) {
+        return total + Number(m.valor || 0);
+    }
+
+    return total;
+}, 0);
+
+const totalLevantamentos = filtrados.reduce((total, m) => {
+    if (['LEVANTAMENTO', 'TRANSFERENCIA_ENVIADA', 'PAGAMENTO_SERVICO'].includes(m.tipo)) {
+        return total + Number(m.valor || 0);
+    }
+
+    return total;
+}, 0);
+
+/*
+ * O saldo final só é apresentado quando existe uma única conta
+ * no contexto atual. Assim evitamos somar saldos de contas diferentes.
+ */
+let saldoFinal = null;
+
+if (contaId) {
+    saldoFinal = filtrados.length
+        ? Number(filtrados[0].saldo_posterior || 0)
+        : null;
+} else {
+    const contasPresentes = [...new Set(
+        filtrados.map(m => String(m.conta_id))
+    )];
+
+    if (contasPresentes.length === 1 && filtrados.length) {
+        saldoFinal = Number(filtrados[0].saldo_posterior || 0);
+    }
+}
+
+const saldoFinalHTML = saldoFinal !== null
+    ? moeda(saldoFinal)
+    : 'Selecione uma conta';
+
+/*
+ * Renderização final.
+ */
+alvo.innerHTML = `
+    <div class="movimentos-table-scroll">
+        <table class="data-table movimentos-data-table">
+            <thead>
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>Conta</th>
+                    <th>Cliente</th>
+                    <th>Operação</th>
+                    <th>Valor</th>
+                    <th>Saldo</th>
+                    <th>Referência</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                ${linhas}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="movimentos-info">
+        <span>
+            A mostrar <strong>${movimentosVisiveis.length}</strong>
+            de <strong>${filtrados.length}</strong> movimento(s)
+        </span>
+        ${
+            filtrados.length > 13
+                ? '<span>Use o scroll vertical para consultar os restantes.</span>'
+                : ''
+        }
+    </div>
+
+    <div class="movimentos-resumo">
+
+        <div class="movimento-resumo-card entrada">
+            <span>Total Depósitos</span>
+            <strong>+${escaparHTML(moeda(totalDepositos))}</strong>
+        </div>
+
+        <div class="movimento-resumo-card saida">
+            <span>Total Levantamentos</span>
+            <strong>−${escaparHTML(moeda(totalLevantamentos))}</strong>
+        </div>
+
+        <div class="movimento-resumo-card saldo">
+            <span>Saldo Final</span>
+            <strong>${escaparHTML(saldoFinalHTML)}</strong>
+        </div>
+
+    </div>
+`;
         alvo.querySelectorAll('[data-movimento-index]').forEach(row => {
             const abrir = () => {
                 const movimento = movimentos[Number(row.dataset.movimentoIndex)];
