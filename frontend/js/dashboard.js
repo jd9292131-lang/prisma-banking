@@ -1316,12 +1316,49 @@ async function renderCreditoReal(main, utilizador) {
             document.getElementById('credResult').innerHTML = `
                 <section class="dashboard-panel credit-result">
                     <div class="panel-header"><div><span>RESULTADO</span><h2>Simulação financeira</h2></div></div>
-                    <div class="dashboard-cards">
-                        <article class="dashboard-card"><div><span>PRESTAÇÃO</span><strong>${moeda(s.prestacao)}</strong></div></article>
-                        <article class="dashboard-card"><div><span>JUROS TOTAIS</span><strong>${moeda(s.jurosTotais)}</strong></div></article>
-                        <article class="dashboard-card"><div><span>CAPITAL EM DÍVIDA</span><strong>${moeda(s.capital)}</strong></div></article>
-                        <article class="dashboard-card"><div><span>TAXA DE ESFORÇO</span><strong>${Number(s.taxaEsforco || 0).toFixed(2)}%</strong></div></article>
-                    </div>
+<div class="dashboard-cards">
+    <article class="dashboard-card">
+        <div>
+            <span>PRESTAÇÃO MENSAL</span>
+            <strong>${moeda(s.prestacao)}</strong>
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div>
+            <span>JUROS TOTAIS</span>
+            <strong>${moeda(s.jurosTotais)}</strong>
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div>
+            <span>CAPITAL EM DÍVIDA</span>
+            <strong>${moeda(s.capital)}</strong>
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div>
+            <span>CAPACIDADE MENSAL DISPONÍVEL</span>
+            <strong>${moeda(s.capacidadeMensal)}</strong>
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div>
+            <span>ESFORÇO DO NOVO CRÉDITO</span>
+            <strong>${Number(s.taxaEsforco || 0).toFixed(2)}%</strong>
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div>
+            <span>ESFORÇO TOTAL</span>
+            <strong>${Number(s.taxaEsforcoTotal || 0).toFixed(2)}%</strong>
+        </div>
+    </article>
+</div>
                     <div class="table-scroll"><table class="data-table"><thead><tr><th>Mês</th><th>Prestação</th><th>Juros</th><th>Capital</th><th>Saldo</th></tr></thead><tbody>${plano.map(linha => `<tr><td>${linha.mes}</td><td>${moeda(linha.prestacao)}</td><td>${moeda(linha.juros)}</td><td>${moeda(linha.capital)}</td><td>${moeda(linha.saldo)}</td></tr>`).join('')}</tbody></table></div>
                     <div class="modal-actions"><button type="button" class="primary-action" id="guardarCredito">Guardar proposta</button><button type="button" class="secondary-action" id="imprimirCredito">Emitir simulação</button></div>
                 </section>
@@ -1334,7 +1371,9 @@ async function renderCreditoReal(main, utilizador) {
                 } catch (error) { mostrarToast(error.message, 'error'); }
             });
 
-            document.getElementById('imprimirCredito')?.addEventListener('click', () => imprimirComprovativo('Simulação de crédito', [['Cliente', clienteItems.find(i => String(i.value) === String(payload.clienteId))?.label || '—'],['Tipo', payload.tipoCredito],['Capital', moeda(s.capital)],['Prestação', moeda(s.prestacao)],['Juros totais', moeda(s.jurosTotais)],['Taxa de esforço', `${Number(s.taxaEsforco || 0).toFixed(2)}%`]]));
+            document.getElementById('imprimirCredito')?.addEventListener('click', () => imprimirComprovativo('Simulação de crédito', [['Cliente', clienteItems.find(i => String(i.value) === String(payload.clienteId))?.label || '—'],['Tipo', payload.tipoCredito],['Capital', moeda(s.capital)],['Prestação', moeda(s.prestacao)],['Juros totais', moeda(s.jurosTotais)],['Capacidade mensal disponível', moeda(s.capacidadeMensal)],
+['Esforço do novo crédito', `${Number(s.taxaEsforco || 0).toFixed(2)}%`],
+['Esforço total', `${Number(s.taxaEsforcoTotal || 0).toFixed(2)}%`]]));
         } catch (error) {
             document.getElementById('credResult').innerHTML = `<div class="error-state">${escaparHTML(error.message)}</div>`;
         }

@@ -260,6 +260,8 @@ async function initializeDatabase() {
         juros_totais NUMERIC(18,2) NOT NULL DEFAULT 0,
         capital_divida NUMERIC(18,2) NOT NULL DEFAULT 0,
         capacidade_endividamento NUMERIC(8,2) NOT NULL DEFAULT 0,
+        capacidade_mensal NUMERIC(18,2) NOT NULL DEFAULT 0,
+        taxa_esforco NUMERIC(8,2) NOT NULL DEFAULT 0,
         estado VARCHAR(30) NOT NULL DEFAULT 'SIMULADO',
         utilizador_id UUID REFERENCES usuarios(id),
         criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -382,6 +384,12 @@ async function initializeDatabase() {
 
       ALTER TABLE contas
       ADD COLUMN IF NOT EXISTS valor_reservado_transferencias NUMERIC(18,2) NOT NULL DEFAULT 0;
+
+      ALTER TABLE creditos
+      ADD COLUMN IF NOT EXISTS capacidade_mensal NUMERIC(18,2) NOT NULL DEFAULT 0;
+
+      ALTER TABLE creditos
+      ADD COLUMN IF NOT EXISTS taxa_esforco NUMERIC(8,2) NOT NULL DEFAULT 0;
 
       CREATE INDEX IF NOT EXISTS idx_transferencias_agendadas
       ON transferencias(estado, data_agendada);

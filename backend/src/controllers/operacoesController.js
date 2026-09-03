@@ -90,7 +90,7 @@ async function operacaoCaixa(req,res){
     const reservado=money(c.valor_reservado_cheques);
     const reservadoTransferencias=money(c.valor_reservado_transferencias);
     const posterior=tipo==='DEPOSITO'?money(anterior+v):money(anterior-v);
-    if(tipo==='LEVANTAMENTO' && money(anterior-v)<money(reservado+reservadoTransferencias)) throw new Error('Saldo disponível insuficiente: existem valores reservados para cheques emitidos.');
+    if(tipo==='LEVANTAMENTO' && money(anterior-v)<money(reservado+reservadoTransferencias)) throw new Error('Saldo disponível insuficiente devido a valores reservados para cheques ou transferências agendadas.');
     if(posterior<0) throw new Error('Saldo insuficiente para o levantamento.');
 
     const saldoCaixaAnterior=await obterSaldoCaixa(client);
@@ -192,15 +192,44 @@ async function simularCredito(req,res){
   try{
     const {valorSolicitado,prazoMeses,taxaJuro,rendimento,encargos,entradaInicial}=req.body||{};
     const valor=money(valorSolicitado), entrada=money(entradaInicial), prazo=Number(prazoMeses), taxa=Number(taxaJuro), rend=money(rendimento), enc=money(encargos);
+
     if(!(valor>0)||!Number.isFinite(valor)||entrada<0||entrada>valor) return res.status(400).json({success:false,message:'Valor ou entrada inicial inválidos.'});
     if(!Number.isInteger(prazo)||prazo<1||prazo>480) return res.status(400).json({success:false,message:'Prazo inválido. Use entre 1 e 480 meses.'});
     if(!Number.isFinite(taxa)||taxa<0||taxa>100) return res.status(400).json({success:false,message:'Taxa anual inválida.'});
     if(rend<0||enc<0) return res.status(400).json({success:false,message:'Rendimento e encargos não podem ser negativos.'});
-    const principal=money(valor-entrada), p=calcPrestacao(principal,taxa,prazo), total=money(p*prazo), juros=money(total-principal), capacidade=money(Math.max(0,rend-enc));
-    return res.json({success:true,simulacao:{capital:principal,prestacao:p,jurosTotais:juros,totalPagar:total,capacidadeMensal:capacidade,taxaEsforco:capacidade?money(p/capacidade*100):0,planoAmortizacao:planoAmortizacao(principal,taxa,prazo)}});
-  }catch(e){ return res.status(400).json({success:false,message:e.message||'Não foi possível simular o crédito.'}); }
-}
 
+    const principal = money(valor - entrada);
+    const p = calcPrestacao(principal, taxa, prazo);
+    const total = money(p * prazo);
+    const juros = money(total - principal);
+
+    const capacidadeMensal = money(Math.max(0, rend - enc));
+
+    const taxaEsforco = capacidadeMensal > 0
+      ? money((p / capacidadeMensal) * 100)
+      : 0;
+
+    const taxaEsforcoTotal = rend > 0
+      ? money(((enc + p) / rend) * 100)
+      : 0;
+
+    return res.json({
+      success: true,
+      simulacao: {
+        capital: principal,
+        prestacao: p,
+        jurosTotais: juros,
+        totalPagar: total,
+        capacidadeMensal,
+        taxaEsforco,
+        taxaEsforcoTotal,
+        planoAmortizacao: planoAmortizacao(principal, taxa, prazo)
+      }
+    });
+  }catch(e){
+    return res.status(400).json({success:false,message:e.message||'Não foi possível simular o crédito.'});
+  }
+}
 async function criarCredito(req,res){
   const {clienteId,tipoCredito,valorSolicitado,prazoMeses,taxaJuro,rendimento,encargos,entradaInicial}=req.body||{};
   const utilizadorId=req.user?.id;
@@ -217,12 +246,60 @@ async function criarCredito(req,res){
     const principal=money(valor-entrada);
     const prest=calcPrestacao(principal,taxa,prazo);
     const juros=money(prest*prazo-principal);
-    const capacidade=rend>0?money(Math.max(0,(rend-enc)/rend*100)):0;
-    const r=await pool.query(`INSERT INTO creditos(referencia,cliente_id,tipo_credito,valor_solicitado,prazo_meses,taxa_anual,rendimento,encargos,entrada_inicial,prestacao,juros_totais,capital_divida,capacidade_endividamento,utilizador_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,[ref('CRD'),clienteId,tipoCredito,valor,prazo,taxa,rend,enc,entrada,prest,juros,principal,capacidade,utilizadorId||null]);
-    return res.status(201).json({success:true,credito:r.rows[0]});
-  }catch(e){ console.error('Erro ao criar crédito:',e); return res.status(400).json({success:false,message:e.message||'Não foi possível criar o crédito.'}); }
-}
+    const capacidadeMensal = money(Math.max(0, rend - enc));
 
+    const taxaEsforco = capacidadeMensal > 0
+      ? money((prest / capacidadeMensal) * 100)
+      : 0;
+const r=await pool.query(`INSERT INTO creditos(
+  referencia,
+  cliente_id,
+  tipo_credito,
+  valor_solicitado,
+  prazo_meses,
+  taxa_anual,
+  rendimento,
+  encargos,
+  entrada_inicial,
+  prestacao,
+  juros_totais,
+  capital_divida,
+  capacidade_endividamento,
+  capacidade_mensal,
+  taxa_esforco,
+  utilizador_id
+) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+RETURNING *`, [
+  ref('CRD'),
+  clienteId,
+  tipoCredito,
+  valor,
+  prazo,
+  taxa,
+  rend,
+  enc,
+  entrada,
+  prest,
+  juros,
+  principal,
+  0,
+  capacidadeMensal,
+  taxaEsforco,
+  utilizadorId || null
+]);
+
+return res.status(201).json({
+  success: true,
+  credito: r.rows[0]
+});
+  } catch (e) {
+    console.error('Erro ao criar crédito:', e);
+    return res.status(400).json({
+      success: false,
+      message: e.message || 'Não foi possível criar o crédito.'
+    });
+  }
+}
 async function analisarRisco(req,res){
   const {clienteId,creditoId,rendimento,despesas,outrosCreditos}=req.body||{};
   const utilizadorId=req.user?.id;
@@ -249,7 +326,7 @@ async function analisarRisco(req,res){
 async function historicoCliente(req,res){try{const r=await pool.query(`SELECT cl.numero_cliente,cl.nome_completo,c.numero_conta,m.tipo,m.valor,m.saldo_posterior,m.referencia,m.descricao,m.criado_em FROM clientes cl LEFT JOIN contas c ON c.cliente_id=cl.id LEFT JOIN movimentos m ON m.conta_id=c.id WHERE cl.id=$1 ORDER BY m.criado_em DESC NULLS LAST`,[req.params.id]);res.json({success:true,historico:r.rows});}catch(e){res.status(500).json({success:false,message:'Erro ao consultar histórico.'});}}
 
 async function pagarServico(req,res){
- const {contaId,entidade,referenciaServico,valor,comissao=0}=req.body; const utilizadorId=req.user.id; const v=money(valor), fee=money(comissao); if(!contaId||!String(entidade||'').trim()||!String(referenciaServico||'').trim()||!Number.isFinite(v)||v<=0||!Number.isFinite(fee)||fee<0)return res.status(400).json({success:false,message:'Dados do pagamento inválidos.'}); const client=await pool.connect(); try{await client.query('BEGIN'); const q=await client.query("SELECT *, COALESCE(valor_reservado_cheques,0) AS valor_reservado_cheques, COALESCE(valor_reservado_transferencias,0) AS valor_reservado_transferencias FROM contas WHERE id=$1 AND estado='ATIVA' FOR UPDATE",[contaId]); if(!q.rows.length)throw new Error('Conta não encontrada ou inativa.'); const c=q.rows[0], total=money(v+fee), anterior=Number(c.saldo), reservado=Number(c.valor_reservado_cheques||0)+Number(c.valor_reservado_transferencias||0), posterior=money(anterior-total); if(posterior<reservado)throw new Error('Saldo disponível insuficiente: existem valores reservados para cheques emitidos.'); await client.query('UPDATE contas SET saldo=$1 WHERE id=$2',[posterior,contaId]); const mov=await client.query(`INSERT INTO movimentos(conta_id,tipo,valor,saldo_anterior,saldo_posterior,referencia,descricao,utilizador_id) VALUES($1,'PAGAMENTO_SERVICO',$2,$3,$4,$5,$6,$7) RETURNING *`,[contaId,total,anterior,posterior,ref('MOV'),`Pagamento ${entidade} — ${referenciaServico}`,utilizadorId||null]); const p=await client.query(`INSERT INTO pagamentos_servicos(conta_id,entidade,referencia_servico,valor,comissao,utilizador_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,[contaId,entidade,referenciaServico,v,fee,utilizadorId||null]); await client.query('COMMIT'); res.status(201).json({success:true,pagamento:p.rows[0],movimento:mov.rows[0],saldo:posterior}); }catch(e){await client.query('ROLLBACK');res.status(400).json({success:false,message:e.message});}finally{client.release();}
+ const {contaId,entidade,referenciaServico,valor,comissao=0}=req.body; const utilizadorId=req.user.id; const v=money(valor), fee=money(comissao); if(!contaId||!String(entidade||'').trim()||!String(referenciaServico||'').trim()||!Number.isFinite(v)||v<=0||!Number.isFinite(fee)||fee<0)return res.status(400).json({success:false,message:'Dados do pagamento inválidos.'}); const client=await pool.connect(); try{await client.query('BEGIN'); const q=await client.query("SELECT *, COALESCE(valor_reservado_cheques,0) AS valor_reservado_cheques, COALESCE(valor_reservado_transferencias,0) AS valor_reservado_transferencias FROM contas WHERE id=$1 AND estado='ATIVA' FOR UPDATE",[contaId]); if(!q.rows.length)throw new Error('Conta não encontrada ou inativa.'); const c=q.rows[0], total=money(v+fee), anterior=Number(c.saldo), reservado=Number(c.valor_reservado_cheques||0)+Number(c.valor_reservado_transferencias||0), posterior=money(anterior-total); if(posterior<reservado)throw new Error('Saldo disponível insuficiente devido a valores reservados para cheques ou transferências agendadas.'); await client.query('UPDATE contas SET saldo=$1 WHERE id=$2',[posterior,contaId]); const mov=await client.query(`INSERT INTO movimentos(conta_id,tipo,valor,saldo_anterior,saldo_posterior,referencia,descricao,utilizador_id) VALUES($1,'PAGAMENTO_SERVICO',$2,$3,$4,$5,$6,$7) RETURNING *`,[contaId,total,anterior,posterior,ref('MOV'),`Pagamento ${entidade} — ${referenciaServico}`,utilizadorId||null]); const p=await client.query(`INSERT INTO pagamentos_servicos(conta_id,entidade,referencia_servico,valor,comissao,utilizador_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,[contaId,entidade,referenciaServico,v,fee,utilizadorId||null]); await client.query('COMMIT'); res.status(201).json({success:true,pagamento:p.rows[0],movimento:mov.rows[0],saldo:posterior}); }catch(e){await client.query('ROLLBACK');res.status(400).json({success:false,message:e.message});}finally{client.release();}
 }
 
 async function fecharCaixa(req,res){
