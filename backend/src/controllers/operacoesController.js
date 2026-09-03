@@ -817,5 +817,561 @@ async function executarTransferenciasAgendadas() {
     client.release();
   }
 }
+/* =========================================================
+ * RECONCILIAÇÃO BANCÁRIA
+ * ========================================================= */
 
-module.exports={executarTransferenciasAgendadas,listarContas,abrirConta,obterConta,historicoConta,listarMovimentos,operacaoCaixa,transferir,simularCredito,criarCredito,analisarRisco,historicoCliente,pagarServico,fecharCaixa,resumoCaixa,historicoCaixa,registarComprovativo,listarComprovativos,obterComprovativo,planoAmortizacao};
+const TIPOS_ENTRADA_RECONCILIACAO = [
+  'DEPOSITO',
+  'DEPOSITO_INICIAL',
+  'TRANSFERENCIA_RECEBIDA'
+];
+
+const TIPOS_SAIDA_RECONCILIACAO = [
+  'LEVANTAMENTO',
+  'TRANSFERENCIA_ENVIADA',
+  'PAGAMENTO_SERVICO'
+];
+
+async function calcularDadosReconciliacao(client, contaId, periodoInicio, periodoFim) {
+  const saldoInicialQuery = await client.query(`
+    SELECT saldo_posterior
+    FROM movimentos
+    WHERE conta_id=$1
+      AND criado_em < $2::date
+    ORDER BY criado_em DESC, id DESC
+    LIMIT 1
+  `, [contaId, periodoInicio]);
+
+  const saldoInicial = saldoInicialQuery.rows.length
+    ? money(saldoInicialQuery.rows[0].saldo_posterior)
+    : 0;
+
+  const movimentosQuery = await client.query(`
+    SELECT
+      m.id,
+      m.conta_id,
+      m.tipo,
+      m.valor,
+      m.saldo_anterior,
+      m.saldo_posterior,
+      m.referencia,
+      m.descricao,
+      m.criado_em,
+      c.numero_conta,
+      cl.nome_completo AS cliente_nome
+    FROM movimentos m
+    JOIN contas c ON c.id=m.conta_id
+    JOIN clientes cl ON cl.id=c.cliente_id
+    WHERE m.conta_id=$1
+      AND m.criado_em >= $2::date
+      AND m.criado_em < ($3::date + INTERVAL '1 day')
+      AND m.tipo = ANY($4::text[])
+    ORDER BY m.criado_em ASC, m.id ASC
+  `, [
+    contaId,
+    periodoInicio,
+    periodoFim,
+    [...TIPOS_ENTRADA_RECONCILIACAO, ...TIPOS_SAIDA_RECONCILIACAO]
+  ]);
+
+  let totalEntradas = 0;
+  let totalSaidas = 0;
+
+  for (const movimento of movimentosQuery.rows) {
+    const valor = money(movimento.valor);
+
+    if (TIPOS_ENTRADA_RECONCILIACAO.includes(movimento.tipo)) {
+      totalEntradas = money(totalEntradas + valor);
+    }
+
+    if (TIPOS_SAIDA_RECONCILIACAO.includes(movimento.tipo)) {
+      totalSaidas = money(totalSaidas + valor);
+    }
+  }
+
+  const saldoSistema = money(
+    saldoInicial + totalEntradas - totalSaidas
+  );
+
+  return {
+    saldoInicial,
+    totalEntradas,
+    totalSaidas,
+    saldoSistema,
+    movimentos: movimentosQuery.rows
+  };
+}
+
+
+async function listarReconciliacoes(req, res) {
+  try {
+    const {
+      contaId = '',
+      estado = ''
+    } = req.query || {};
+
+    const params = [];
+    const where = [];
+
+    if (contaId) {
+      params.push(contaId);
+      where.push(`r.conta_id=$${params.length}`);
+    }
+
+    if (estado) {
+      params.push(estado);
+      where.push(`r.estado=$${params.length}`);
+    }
+
+    const r = await pool.query(`
+      SELECT
+        r.*,
+        c.numero_conta,
+        cl.nome_completo AS cliente_nome,
+        u.nome_exibicao AS operador
+      FROM reconciliacoes r
+      JOIN contas c ON c.id=r.conta_id
+      JOIN clientes cl ON cl.id=c.cliente_id
+      LEFT JOIN usuarios u ON u.id=r.utilizador_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY r.criado_em DESC
+      LIMIT 300
+    `, params);
+
+    return res.json({
+      success: true,
+      reconciliacoes: r.rows
+    });
+  } catch (e) {
+    console.error('Erro ao consultar reconciliações:', e);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao consultar reconciliações.'
+    });
+  }
+}
+
+
+async function obterReconciliacao(req, res) {
+  const { id } = req.params;
+
+  try {
+    const r = await pool.query(`
+      SELECT
+        r.*,
+        c.numero_conta,
+        cl.nome_completo AS cliente_nome,
+        cl.numero_cliente,
+        u.nome_exibicao AS operador
+      FROM reconciliacoes r
+      JOIN contas c ON c.id=r.conta_id
+      JOIN clientes cl ON cl.id=c.cliente_id
+      LEFT JOIN usuarios u ON u.id=r.utilizador_id
+      WHERE r.id=$1
+    `, [id]);
+
+    if (!r.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reconciliação não encontrada.'
+      });
+    }
+
+    const movimentos = await pool.query(`
+      SELECT
+        rm.*,
+        m.tipo,
+        m.referencia,
+        m.descricao,
+        m.criado_em,
+        m.saldo_anterior,
+        m.saldo_posterior
+      FROM reconciliacao_movimentos rm
+      JOIN movimentos m ON m.id=rm.movimento_id
+      WHERE rm.reconciliacao_id=$1
+      ORDER BY m.criado_em ASC, m.id ASC
+    `, [id]);
+
+    return res.json({
+      success: true,
+      reconciliacao: r.rows[0],
+      movimentos: movimentos.rows
+    });
+  } catch (e) {
+    console.error('Erro ao obter reconciliação:', e);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao consultar a reconciliação.'
+    });
+  }
+}
+
+
+async function criarReconciliacao(req, res) {
+  const {
+    contaId,
+    periodoInicio,
+    periodoFim,
+    saldoExtrato = null,
+    observacoes = null
+  } = req.body || {};
+
+  const utilizadorId = req.user?.id || null;
+
+  if (!utilizadorId) {
+    return res.status(401).json({
+      success: false,
+      message: 'Operador autenticado não identificado.'
+    });
+  }
+
+  if (!contaId || !periodoInicio || !periodoFim) {
+    return res.status(400).json({
+      success: false,
+      message: 'Conta e período da reconciliação são obrigatórios.'
+    });
+  }
+
+  if (periodoInicio > periodoFim) {
+    return res.status(400).json({
+      success: false,
+      message: 'A data inicial não pode ser posterior à data final.'
+    });
+  }
+
+  let extrato = null;
+
+  if (
+    saldoExtrato !== null &&
+    saldoExtrato !== '' &&
+    (!Number.isFinite(Number(saldoExtrato)) || Number(saldoExtrato) < 0)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Saldo do extrato inválido.'
+    });
+  }
+
+  if (saldoExtrato !== null && saldoExtrato !== '') {
+    extrato = money(saldoExtrato);
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const contaQuery = await client.query(`
+      SELECT
+        id,
+        numero_conta,
+        cliente_id,
+        estado
+      FROM contas
+      WHERE id=$1
+      FOR SHARE
+    `, [contaId]);
+
+    if (!contaQuery.rows.length) {
+      throw new Error('Conta não encontrada.');
+    }
+
+    const conta = contaQuery.rows[0];
+
+    if (conta.estado !== 'ATIVA') {
+      throw new Error('A conta selecionada não está ativa.');
+    }
+
+    const dados = await calcularDadosReconciliacao(
+      client,
+      contaId,
+      periodoInicio,
+      periodoFim
+    );
+
+    const diferenca = extrato === null
+      ? 0
+      : money(extrato - dados.saldoSistema);
+
+    const estado = extrato === null
+      ? 'PENDENTE'
+      : Math.abs(diferenca) < 0.01
+        ? 'RECONCILIADO'
+        : 'COM_DIFERENCA';
+
+    const referencia = ref('REC');
+
+    const reconciliacao = await client.query(`
+      INSERT INTO reconciliacoes(
+        referencia,
+        conta_id,
+        periodo_inicio,
+        periodo_fim,
+        saldo_inicial,
+        total_entradas,
+        total_saidas,
+        saldo_sistema,
+        saldo_extrato,
+        diferenca,
+        estado,
+        observacoes,
+        utilizador_id,
+        reconciliado_em
+      )
+      VALUES(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+        CASE
+          WHEN $11='RECONCILIADO' THEN CURRENT_TIMESTAMP
+          ELSE NULL
+        END
+      )
+      RETURNING *
+    `, [
+      referencia,
+      contaId,
+      periodoInicio,
+      periodoFim,
+      dados.saldoInicial,
+      dados.totalEntradas,
+      dados.totalSaidas,
+      dados.saldoSistema,
+      extrato,
+      diferenca,
+      estado,
+      observacoes || null,
+      utilizadorId
+    ]);
+
+    const recId = reconciliacao.rows[0].id;
+
+    for (const movimento of dados.movimentos) {
+      await client.query(`
+        INSERT INTO reconciliacao_movimentos(
+          reconciliacao_id,
+          movimento_id,
+          valor_sistema,
+          valor_extrato,
+          diferenca,
+          estado
+        )
+        VALUES($1,$2,$3,NULL,0,'PENDENTE')
+      `, [
+        recId,
+        movimento.id,
+        money(movimento.valor)
+      ]);
+    }
+
+    await client.query(`
+      INSERT INTO auditoria_operacoes(
+        utilizador_id,
+        modulo,
+        acao,
+        referencia,
+        detalhes
+      )
+      VALUES($1,'RECONCILIACAO','CRIACAO',$2,$3)
+    `, [
+      utilizadorId,
+      referencia,
+      JSON.stringify({
+        contaId,
+        periodoInicio,
+        periodoFim,
+        saldoExtrato: extrato,
+        saldoSistema: dados.saldoSistema,
+        diferenca
+      })
+    ]);
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Reconciliação criada com sucesso.',
+      reconciliacao: reconciliacao.rows[0],
+      movimentos: dados.movimentos
+    });
+
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    console.error('Erro ao criar reconciliação:', e);
+
+    return res.status(400).json({
+      success: false,
+      message: e.message || 'Não foi possível criar a reconciliação.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+
+async function finalizarReconciliacao(req, res) {
+  const { id } = req.params;
+  const {
+    saldoExtrato,
+    observacoes = null
+  } = req.body || {};
+
+  const utilizadorId = req.user?.id || null;
+
+  if (!utilizadorId) {
+    return res.status(401).json({
+      success: false,
+      message: 'Operador autenticado não identificado.'
+    });
+  }
+
+  if (
+    saldoExtrato === undefined ||
+    saldoExtrato === null ||
+    saldoExtrato === '' ||
+    !Number.isFinite(Number(saldoExtrato)) ||
+    Number(saldoExtrato) < 0
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Informe um saldo de extrato válido.'
+    });
+  }
+
+  const extrato = money(saldoExtrato);
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const recQuery = await client.query(`
+      SELECT *
+      FROM reconciliacoes
+      WHERE id=$1
+      FOR UPDATE
+    `, [id]);
+
+    if (!recQuery.rows.length) {
+      throw new Error('Reconciliação não encontrada.');
+    }
+
+    const rec = recQuery.rows[0];
+
+    if (rec.estado === 'RECONCILIADO') {
+      throw new Error('Esta reconciliação já está finalizada como reconciliada.');
+    }
+
+    const dados = await calcularDadosReconciliacao(
+      client,
+      rec.conta_id,
+      rec.periodo_inicio,
+      rec.periodo_fim
+    );
+
+    const diferenca = money(extrato - dados.saldoSistema);
+
+    const estado = Math.abs(diferenca) < 0.01
+      ? 'RECONCILIADO'
+      : 'COM_DIFERENCA';
+
+    const atualizada = await client.query(`
+      UPDATE reconciliacoes
+      SET
+        saldo_inicial=$1,
+        total_entradas=$2,
+        total_saidas=$3,
+        saldo_sistema=$4,
+        saldo_extrato=$5,
+        diferenca=$6,
+        estado=$7,
+        observacoes=COALESCE($8, observacoes),
+        reconciliado_em=CASE
+          WHEN $7='RECONCILIADO' THEN CURRENT_TIMESTAMP
+          ELSE NULL
+        END
+      WHERE id=$9
+      RETURNING *
+    `, [
+      dados.saldoInicial,
+      dados.totalEntradas,
+      dados.totalSaidas,
+      dados.saldoSistema,
+      extrato,
+      diferenca,
+      estado,
+      observacoes,
+      id
+    ]);
+
+    await client.query(`
+      INSERT INTO auditoria_operacoes(
+        utilizador_id,
+        modulo,
+        acao,
+        referencia,
+        detalhes
+      )
+      VALUES($1,'RECONCILIACAO','FINALIZACAO',$2,$3)
+    `, [
+      utilizadorId,
+      rec.referencia,
+      JSON.stringify({
+        saldoExtrato: extrato,
+        saldoSistema: dados.saldoSistema,
+        diferenca,
+        estado
+      })
+    ]);
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      message: estado === 'RECONCILIADO'
+        ? 'Reconciliação concluída sem diferenças.'
+        : 'Reconciliação concluída com diferença.',
+      reconciliacao: atualizada.rows[0]
+    });
+
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    console.error('Erro ao finalizar reconciliação:', e);
+
+    return res.status(400).json({
+      success: false,
+      message: e.message || 'Não foi possível finalizar a reconciliação.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+module.exports={
+  executarTransferenciasAgendadas,
+  listarContas,
+  abrirConta,
+  obterConta,
+  historicoConta,
+  listarMovimentos,
+  operacaoCaixa,
+  transferir,
+  simularCredito,
+  criarCredito,
+  analisarRisco,
+  historicoCliente,
+  pagarServico,
+  fecharCaixa,
+  resumoCaixa,
+  historicoCaixa,
+  registarComprovativo,
+  listarComprovativos,
+  obterComprovativo,
+  planoAmortizacao,
+  listarReconciliacoes,
+  obterReconciliacao,
+  criarReconciliacao,
+  finalizarReconciliacao
+};

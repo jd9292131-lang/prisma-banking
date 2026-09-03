@@ -293,6 +293,52 @@ async function initializeDatabase() {
         utilizador_id UUID REFERENCES usuarios(id),
         criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+              CREATE TABLE IF NOT EXISTS reconciliacoes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        referencia VARCHAR(50) UNIQUE NOT NULL,
+        conta_id UUID NOT NULL REFERENCES contas(id),
+        periodo_inicio DATE NOT NULL,
+        periodo_fim DATE NOT NULL,
+        saldo_inicial NUMERIC(18,2) NOT NULL DEFAULT 0,
+        total_entradas NUMERIC(18,2) NOT NULL DEFAULT 0,
+        total_saidas NUMERIC(18,2) NOT NULL DEFAULT 0,
+        saldo_sistema NUMERIC(18,2) NOT NULL DEFAULT 0,
+        saldo_extrato NUMERIC(18,2),
+        diferenca NUMERIC(18,2) NOT NULL DEFAULT 0,
+        estado VARCHAR(30) NOT NULL DEFAULT 'PENDENTE',
+        observacoes TEXT,
+        utilizador_id UUID REFERENCES usuarios(id),
+        reconciliado_em TIMESTAMP,
+        criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS reconciliacao_movimentos (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reconciliacao_id UUID NOT NULL
+          REFERENCES reconciliacoes(id) ON DELETE CASCADE,
+        movimento_id UUID NOT NULL
+          REFERENCES movimentos(id),
+        valor_sistema NUMERIC(18,2) NOT NULL,
+        valor_extrato NUMERIC(18,2),
+        diferenca NUMERIC(18,2) NOT NULL DEFAULT 0,
+        estado VARCHAR(30) NOT NULL DEFAULT 'PENDENTE',
+        observacao TEXT,
+        criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE (reconciliacao_id, movimento_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reconciliacoes_conta_periodo
+        ON reconciliacoes(conta_id, periodo_inicio, periodo_fim);
+
+      CREATE INDEX IF NOT EXISTS idx_reconciliacoes_estado
+        ON reconciliacoes(estado);
+
+      CREATE INDEX IF NOT EXISTS idx_reconciliacao_movimentos_reconciliacao
+        ON reconciliacao_movimentos(reconciliacao_id);
+
+      CREATE INDEX IF NOT EXISTS idx_reconciliacao_movimentos_movimento
+        ON reconciliacao_movimentos(movimento_id);
 
       CREATE TABLE IF NOT EXISTS auditoria_operacoes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -468,7 +514,11 @@ async function initializeDatabase() {
         ('DASHBOARD_VISUALIZAR'),
         ('CLIENTES_VISUALIZAR'),('CLIENTES_CRIAR'),('CLIENTES_EDITAR'),('CLIENTES_ELIMINAR'),
         ('CONTAS_VISUALIZAR'),('CONTAS_ABRIR'),
-        ('MOVIMENTOS_VISUALIZAR'),('CAIXA_OPERAR'),('CAIXA_RECONCILIAR'),
+        ('MOVIMENTOS_VISUALIZAR'),
+        ('CAIXA_OPERAR'),
+        ('CAIXA_RECONCILIAR'),
+        ('RECONCILIACAO_VISUALIZAR'),
+        ('RECONCILIACAO_OPERAR'),
         ('TRANSFERENCIAS_OPERAR'),('CREDITO_SIMULAR'),('CREDITO_OPERAR'),('RISCO_ANALISAR'),
         ('COMPROVATIVOS_EMITIR'),('DOCUMENTOS_VISUALIZAR'),
         ('CARTOES_OPERAR'),('CHEQUES_OPERAR'),

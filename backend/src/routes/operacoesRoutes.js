@@ -7,4 +7,8 @@ r.get('/movimentos',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.listarMovimentos)
 r.post('/transferencias',exigirPermissao('TRANSFERENCIAS_OPERAR'),c.transferir); r.post('/credito/simular',exigirPermissao('CREDITO_SIMULAR'),c.simularCredito); r.post('/credito',exigirPermissao('CREDITO_OPERAR'),c.criarCredito); r.post('/risco',exigirPermissao('RISCO_ANALISAR'),c.analisarRisco);
 r.get('/clientes/:id/historico',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.historicoCliente);
 r.get('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.listarComprovativos); r.get('/comprovativos/:id',exigirPermissao('COMPROVATIVOS_EMITIR'),c.obterComprovativo); r.post('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.registarComprovativo);
+r.get('/reconciliacoes',exigirPermissao('RECONCILIACAO_VISUALIZAR'),c.listarReconciliacoes);
+r.get('/reconciliacoes/:id',exigirPermissao('RECONCILIACAO_VISUALIZAR'),c.obterReconciliacao);
+r.post('/reconciliacoes',exigirPermissao('RECONCILIACAO_OPERAR'),c.criarReconciliacao);
+r.post('/reconciliacoes/:id/finalizar',exigirPermissao('RECONCILIACAO_OPERAR'),c.finalizarReconciliacao);
 module.exports=r;
