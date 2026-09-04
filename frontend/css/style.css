@@ -2390,11 +2390,47 @@ select:focus {
     min-width: 0;
 }
 
-/* Caixa de confirmação de sessão */
-.prisma-confirm-modal {
+/* =========================================================
+   MODAIS DE CONFIRMAÇÃO — LOGOUT / ELIMINAÇÕES
+   ========================================================= */
+
+/*
+ * O mostrarModal() já cria .prisma-modal.
+ * Quando o conteúdo contém .prisma-confirm-modal,
+ * a caixa exterior não deve parecer uma segunda janela.
+ */
+.prisma-modal:has(.prisma-confirm-modal) {
     width: min(430px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+
+    padding: 0;
+
+    background: transparent;
+
+    border: none;
+    border-radius: 0;
+
+    box-shadow: none;
+
+    overflow: visible;
 }
 
+/*
+ * Caixa real da confirmação.
+ */
+.prisma-confirm-modal {
+    width: 100%;
+    max-width: 430px;
+
+    padding: 24px;
+
+    background: #ffffff;
+
+    border: 1px solid var(--border);
+    border-radius: 12px;
+
+    box-shadow: 0 24px 60px rgba(16, 38, 63, 0.22);
+}
 .prisma-confirm-icon {
     width: 48px;
     height: 48px;

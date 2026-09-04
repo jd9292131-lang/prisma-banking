@@ -158,9 +158,6 @@ async function initializeDatabase() {
         ) > 0
       )
     `);
-
-
-
     await client.query(`
       CREATE TABLE IF NOT EXISTS documentos_cliente (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -316,18 +313,26 @@ async function initializeDatabase() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         reconciliacao_id UUID NOT NULL
           REFERENCES reconciliacoes(id) ON DELETE CASCADE,
-        movimento_id UUID NOT NULL
+
+        movimento_id UUID
           REFERENCES movimentos(id),
-        valor_sistema NUMERIC(18,2) NOT NULL,
+
+        data_extrato DATE,
+        referencia_extrato VARCHAR(100),
+        descricao_extrato TEXT,
+        tipo_extrato VARCHAR(40),
+
+        valor_sistema NUMERIC(18,2),
         valor_extrato NUMERIC(18,2),
+
         diferenca NUMERIC(18,2) NOT NULL DEFAULT 0,
         estado VARCHAR(30) NOT NULL DEFAULT 'PENDENTE',
         observacao TEXT,
+
         criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
         UNIQUE (reconciliacao_id, movimento_id)
       );
-
       CREATE INDEX IF NOT EXISTS idx_reconciliacoes_conta_periodo
         ON reconciliacoes(conta_id, periodo_inicio, periodo_fim);
 

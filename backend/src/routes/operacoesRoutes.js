@@ -9,6 +9,16 @@ r.get('/clientes/:id/historico',exigirPermissao('MOVIMENTOS_VISUALIZAR'),c.histo
 r.get('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.listarComprovativos); r.get('/comprovativos/:id',exigirPermissao('COMPROVATIVOS_EMITIR'),c.obterComprovativo); r.post('/comprovativos',exigirPermissao('COMPROVATIVOS_EMITIR'),c.registarComprovativo);
 r.get('/reconciliacoes',exigirPermissao('RECONCILIACAO_VISUALIZAR'),c.listarReconciliacoes);
 r.get('/reconciliacoes/:id',exigirPermissao('RECONCILIACAO_VISUALIZAR'),c.obterReconciliacao);
+r.patch(
+  '/reconciliacoes/:id/movimentos/:movimentoId',
+  exigirPermissao('RECONCILIACAO_OPERAR'),
+  c.atualizarMovimentoReconciliacao
+);
 r.post('/reconciliacoes',exigirPermissao('RECONCILIACAO_OPERAR'),c.criarReconciliacao);
 r.post('/reconciliacoes/:id/finalizar',exigirPermissao('RECONCILIACAO_OPERAR'),c.finalizarReconciliacao);
+r.post(
+  '/reconciliacoes/:id/movimentos-extrato',
+  exigirPermissao('RECONCILIACAO_OPERAR'),
+  c.adicionarMovimentoExtrato
+);
 module.exports=r;
