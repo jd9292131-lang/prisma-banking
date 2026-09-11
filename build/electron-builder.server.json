@@ -1,0 +1,38 @@
+{
+  "appId": "ao.prisma.educacional.banking",
+  "productName": "PRISMA Banking",
+  "asar": true,
+  "asarUnpack": [
+    "backend/**/*"
+  ],
+  "files": [
+    "electron-main.js",
+    "electron/**/*",
+    "backend/**/*",
+    "frontend/**/*"
+  ],
+  "extraMetadata": {
+    "prismaMode": "server"
+  },
+  "directories": {
+    "output": "dist"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "artifactName": "PRISMA-Banking-Servidor-${version}-${arch}.${ext}",
+    "icon": "frontend/assets/prisma-banking.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}
