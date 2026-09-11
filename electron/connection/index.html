@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>PRISMA Banking — Servidor</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+
+            background: #eef1f4;
+            color: #17202a;
+        }
+
+        .container {
+            width: min(520px, 90vw);
+
+            background: #ffffff;
+
+            border-radius: 16px;
+
+            padding: 32px;
+
+            box-shadow:
+                0 12px 35px rgba(0, 0, 0, 0.12);
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #667085;
+            margin-bottom: 28px;
+        }
+
+        label {
+            display: block;
+
+            font-size: 14px;
+            font-weight: 600;
+
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+
+            padding: 13px 14px;
+
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+
+            font-size: 15px;
+
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #667085;
+        }
+
+        button {
+            width: 100%;
+
+            margin-top: 18px;
+
+            padding: 13px;
+
+            border: 0;
+            border-radius: 10px;
+
+            background: #17202a;
+            color: #ffffff;
+
+            font-size: 15px;
+            font-weight: 600;
+
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 18px;
+
+            min-height: 22px;
+
+            text-align: center;
+
+            font-size: 14px;
+            color: #667085;
+        }
+
+        .example {
+            margin-top: 10px;
+
+            font-size: 12px;
+            color: #98a2b3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="container">
+
+        <div class="logo">
+            PRISMA Banking
+        </div>
+
+        <div class="subtitle">
+            Conectar ao Servidor PRISMA
+        </div>
+
+        <label for="serverAddress">
+            Endereço do servidor
+        </label>
+
+        <input
+            id="serverAddress"
+            type="text"
+            autocomplete="off"
+            placeholder="192.168.137.1:3000"
+        >
+
+        <div class="example">
+            Exemplo: 192.168.137.1:3000
+        </div>
+
+        <button id="connectButton">
+            Conectar
+        </button>
+
+        <div
+            id="status"
+            class="status"
+        >
+            Introduza o endereço do servidor.
+        </div>
+
+    </main>
+<script>
+    const serverAddress = document.getElementById('serverAddress');
+    const connectButton = document.getElementById('connectButton');
+    const status = document.getElementById('status');
+
+    connectButton.addEventListener('click', async () => {
+        const address = serverAddress.value.trim();
+
+        if (!address) {
+            status.textContent =
+                'Introduza o endereço do servidor.';
+            return;
+        }
+
+        connectButton.disabled = true;
+        serverAddress.disabled = true;
+
+        status.textContent =
+            'A verificar o servidor PRISMA...';
+
+        try {
+            const resultado =
+                await window.prismaConnection.conectar(address);
+
+            if (resultado.success) {
+                status.textContent =
+                    'Servidor conectado com sucesso.';
+
+                setTimeout(() => {
+                    window.close();
+                }, 500);
+
+                return;
+            }
+
+            status.textContent =
+                resultado.message ||
+                'Não foi possível conectar ao servidor.';
+
+        } catch (error) {
+            console.error(error);
+
+            status.textContent =
+                'Ocorreu um erro ao tentar conectar ao servidor.';
+        }
+
+        connectButton.disabled = false;
+        serverAddress.disabled = false;
+    });
+
+    serverAddress.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            connectButton.click();
+        }
+    });
+</script>
+</body>
+</html>

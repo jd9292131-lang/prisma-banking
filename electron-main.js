@@ -3,9 +3,20 @@ const {
     BrowserWindow,
     dialog,
     shell,
-    utilityProcess
+    utilityProcess,
+    ipcMain
 } = require('electron');
-
+const {
+    MODE,
+    isServer,
+    isClient,
+    DEFAULT_PORT
+} = require('./electron/mode');
+const {
+    obterServidorConfigurado,
+    guardarServidorConfigurado,
+    normalizarURL
+} = require('./electron/server-config');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -16,7 +27,69 @@ let backendProcess = null;
 let backendStartedByPrisma = false;
 let backendLastError = '';
 let shuttingDown = false;
+ipcMain.handle('prisma:connect-server', async (_event, serverUrl) => {
+    try {
+        const urlNormalizada =
+            normalizarURL(serverUrl);
 
+        if (!urlNormalizada) {
+            return {
+                success: false,
+                message:
+                    'Endereço do servidor inválido.'
+            };
+        }
+
+        const apiAnterior = API_URL;
+        const healthAnterior = HEALTH_URL;
+
+        API_URL = urlNormalizada;
+        HEALTH_URL = `${API_URL}/api/health`;
+
+        const servidorDisponivel =
+            await verificarAPI();
+
+        if (!servidorDisponivel) {
+            API_URL = apiAnterior;
+            HEALTH_URL = healthAnterior;
+
+            return {
+                success: false,
+                message:
+                    'Não foi possível conectar ao servidor PRISMA.'
+            };
+        }
+
+        guardarServidorConfigurado(
+            urlNormalizada
+        );
+
+        return {
+            success: true,
+            serverUrl: urlNormalizada
+        };
+
+    } catch (error) {
+        console.error(
+            '[PRISMA] Erro ao conectar ao servidor:',
+            error
+        );
+
+        return {
+            success: false,
+            message:
+                error.message ||
+                'Erro ao conectar ao servidor.'
+        };
+    }
+});
+
+ipcMain.handle('prisma:cancel-connect', () => {
+    return {
+        success: false,
+        cancelled: true
+    };
+});
 // Apenas uma instância do PRISMA Banking pode executar por computador.
 // Evita múltiplos backends locais e sessões concorrentes em portas diferentes.
 const singleInstanceLock = app.requestSingleInstanceLock();
@@ -30,10 +103,17 @@ if (!singleInstanceLock) {
     });
 }
 
-const PORT_INICIAL = Number(process.env.PRISMA_PORT) || 3000;
+const PORT_INICIAL = Number(process.env.PRISMA_PORT) || DEFAULT_PORT;
+
 let PORT = PORT_INICIAL;
-let API_URL = `http://127.0.0.1:${PORT}`;
-let HEALTH_URL = `${API_URL}/api/health`;
+
+let API_URL = isClient
+    ? (obterServidorConfigurado() || '')
+    : `http://127.0.0.1:${PORT}`;
+
+let HEALTH_URL = API_URL
+    ? `${API_URL}/api/health`
+    : '';
 
 function portaDisponivel(porta) {
     return new Promise(resolve => {
@@ -220,14 +300,20 @@ function verificarAPI() {
 
 async function iniciarBackend() {
 
+    if (isClient) {
+        console.log('[PRISMA] Modo CLIENTE: backend local não será iniciado.');
+        return true;
+    }
+
+    // Reutilizar uma API já ativa na porta padrão evita iniciar um segundo
     // Reutilizar uma API já ativa na porta padrão evita iniciar um segundo
     // backend quando o modo de desenvolvimento já deixou o serviço ligado.
     PORT = PORT_INICIAL;
     API_URL = `http://127.0.0.1:${PORT}`;
     HEALTH_URL = `${API_URL}/api/health`;
 
-    if (await verificarAPI()) {
-        console.log(`[PRISMA] Serviço local já está ativo em ${API_URL}.`);
+    if (!app.isPackaged && await verificarAPI()) {
+         console.log(`[PRISMA] Serviço local já está ativo em ${API_URL}.`);
         backendStartedByPrisma = false;
         return true;
     }
@@ -440,12 +526,66 @@ async function aguardarServidor(
     return false;
 }
 
+function criarJanelaConexao() {
+    return new Promise((resolve) => {
+        const janelaConexao = new BrowserWindow({
+            width: 520,
+            height: 620,
+            minWidth: 480,
+            minHeight: 560,
+            resizable: false,
+            maximizable: false,
+            minimizable: false,
+            title: 'PRISMA Banking — Conectar ao Servidor',
+            icon: path.join(
+                app.getAppPath(),
+                'frontend',
+                'assets',
+                'prisma-banking.ico'
+            ),
+            webPreferences: {
+                preload: path.join(
+                    app.getAppPath(),
+                    'electron',
+                    'connection',
+                    'preload.js'
+                ),
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: true
+            }
+        });
 
+        janelaConexao.loadFile(
+            path.join(
+                app.getAppPath(),
+                'electron',
+                'connection',
+                'index.html'
+            )
+        );
+
+        janelaConexao.on('closed', () => {
+            resolve({
+                success: false,
+                cancelled: true
+            });
+        });
+    });
+}
 /* =========================================================
    CRIAR JANELA
    ========================================================= */
 
 function criarJanela() {
+
+    if (isClient && !API_URL) {
+        console.error(
+            '[PRISMA] Modo CLIENTE: nenhum servidor está configurado.'
+        );
+
+        return false;
+    }
 
     const iconPath = path.join(
         app.getAppPath(),
@@ -542,9 +682,34 @@ function criarJanela() {
 
 async function iniciarAplicacao() {
 
+if (isClient) {
+    console.log('[PRISMA] Modo CLIENTE detectado.');
+    console.log('[PRISMA] O cliente não iniciará backend local.');
+
+    if (!API_URL) {
+        console.log(
+            '[PRISMA] Nenhum servidor configurado.'
+        );
+
+        const conexao =
+            await criarJanelaConexao();
+
+        if (!conexao.success) {
+            console.log(
+                '[PRISMA] Conexão cancelada.'
+            );
+
+            app.quit();
+            return;
+        }
+    }
+
+    criarJanela();
+
+    return;
+}
     const backendIniciado =
         await iniciarBackend();
-
 
     if (!backendIniciado) {
 

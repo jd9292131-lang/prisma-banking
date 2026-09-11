@@ -31,7 +31,13 @@ if (!fs.existsSync(FRONTEND_INDEX)) {
 // Middlewares
 app.use(helmet());
 app.use(cors({
-    origin: [/^https?:\/\/127\.0\.0\.1(?::\d+)?$/, /^https?:\/\/localhost(?::\d+)?$/],
+origin: [
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?$/,
+    /^https?:\/\/localhost(?::\d+)?$/,
+    /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(?::\d+)?$/,
+    /^https?:\/\/10\.\d{1,3}\.\d{1,3}(?::\d+)?$/,
+    /^https?:\/\/172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(?::\d+)?$/
+],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -89,13 +95,15 @@ async function iniciarServidor() {
         }, 30 * 1000);
         scheduler.unref?.();
 
-        app.listen(PORT, '127.0.0.1', () => {
-            console.log('');
+const HOST = process.env.PRISMA_HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+        console.log('');
             console.log('======================================');
             console.log('   PRISMA EDUCACIONAL');
             console.log('   BANKING');
             console.log('======================================');
-            console.log(`Servidor: http://127.0.0.1:${PORT}`);
+            console.log(`Servidor: http://${HOST}:${PORT}`);
             console.log('Modo: LOCAL / OFFLINE');
             console.log('Base de dados: PostgreSQL OK');
             console.log('======================================');
