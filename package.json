@@ -8,13 +8,17 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis",
-    "dist:portable": "electron-builder --win portable",
-    "dist:all": "npm run dist && npm run dist:portable",
+    "dist": "npm run dist:server",
+    "dist:server": "npm run prepare:backend && npm run verify && npm run preflight:build && electron-builder --win nsis --config build/electron-builder.server.json",
+    "dist:server:portable": "npm run prepare:backend && npm run verify && npm run preflight:build && electron-builder --win portable --config build/electron-builder.server.json",
+    "dist:client": "node scripts/verify-client.js && electron-builder --win nsis --config build/electron-builder.client.json",
+    "dist:all": "npm run dist:server && npm run dist:server:portable && npm run dist:client",
+    "dist:portable": "npm run dist:server:portable",
     "prepare:backend": "npm ci --prefix backend --omit=dev",
     "pre-dist": "npm run prepare:backend && npm run verify && npm run preflight:build",
     "pre-dist:portable": "npm run prepare:backend && npm run verify && npm run preflight:build",
     "verify": "node scripts/verify.js",
+    "verify:client": "node scripts/verify-client.js",
     "preflight:build": "node scripts/preflight-build.js"
   },
   "devDependencies": {
@@ -30,6 +34,7 @@
     ],
     "files": [
       "electron-main.js",
+      "electron/**/*",
       "backend/**/*",
       "frontend/**/*"
     ],

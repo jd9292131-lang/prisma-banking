@@ -1,4 +1,10 @@
-const MODE = String(process.env.PRISMA_MODE || 'server').toLowerCase();
+const packageMetadata = require('../package.json');
+
+const MODE = String(
+    process.env.PRISMA_MODE ||
+    packageMetadata.prismaMode ||
+    'server'
+).toLowerCase();
 
 if (!['server', 'client'].includes(MODE)) {
     throw new Error(
